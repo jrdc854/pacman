@@ -20,8 +20,8 @@ INPUT_SIZE = None  # Se determinará en tiempo de ejecución basado en el tamañ
 HIDDEN_SIZE = 128
 NUM_ACTIONS = 5  # Stop, North, South, East, West
 BATCH_SIZE = 64
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 100
+LEARNING_RATE = 0.005 # reducido de 0.001 para que sea más estable con datasets medianos
+NUM_EPOCHS = 150 # más épocas, pero con early stopping para no sobreajustar 
 MODELS_DIR = "models"
 
 # Mapeo de acciones a índices
@@ -110,6 +110,54 @@ def load_and_merge_data(data_dir="pacman_data"):
     print(f"Datos cargados: {len(all_maps)} ejemplos")
     return all_maps, all_actions
 
+def balance_dataset(maps, actions):
+    """
+    Balancea el dataset para que todas las acciones tengan la misma frecuencia.
+    
+    Estrategia: oversampling de clases minoritarias hasta igualar la clase más frecuente.
+    Esto evita que la red ignore acciones poco comunes como Stop o movimientos raros.
+    
+    Alternativa conservadora: en vez de max_count se puede usar int(max_count * 0.75)
+    para no inflar demasiado el dataset con duplicados.
+    """
+    counter = Counter(actions)
+    print(f"\nDistribución ANTES del balanceo:")
+    for idx, count in sorted(counter.items()):
+        action_name = IDX_TO_ACTION[idx]
+        print(f"  {action_name:6s} (idx {idx}): {count:5d} ejemplos")
+    
+    # Agrupar por clase
+    class_indices = {cls: [] for cls in counter}
+    for i, action in enumerate(actions):
+        class_indices[action].append(i)
+    
+    # Oversample hasta la clase más frecuente
+    max_count = max(counter.values())
+    
+    balanced_maps = []
+    balanced_actions = []
+    
+    for cls, indices in class_indices.items():
+        # Repetir los índices de esta clase hasta llegar a max_count
+        oversampled = indices * (max_count // len(indices)) + random.sample(indices, max_count % len(indices))
+        for i in oversampled:
+            balanced_maps.append(maps[i])
+            balanced_actions.append(actions[i])
+    
+    # Mezclar para que no estén agrupados por clase
+    combined = list(zip(balanced_maps, balanced_actions))
+    random.shuffle(combined)
+    balanced_maps, balanced_actions = zip(*combined)
+    
+    counter_after = Counter(balanced_actions)
+    print(f"\nDistribución DESPUÉS del balanceo:")
+    for idx, count in sorted(counter_after.items()):
+        action_name = IDX_TO_ACTION[idx]
+        print(f"  {action_name:6s} (idx {idx}): {count:5d} ejemplos")
+    print(f"  Total: {len(balanced_actions)} ejemplos\n")
+    
+    return list(balanced_maps), list(balanced_actions)
+    
 def preprocess_maps(maps):
     """Preprocesa las matrices del juego para preparar los datos de entrada para la red"""
     # Determinar las dimensiones del mapa
