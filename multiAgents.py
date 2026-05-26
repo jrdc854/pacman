@@ -502,10 +502,7 @@ class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
         self.w_heuristic = float(w_heuristic)
         self.w_neural = float(w_neural)
         
-        # Inicializamos el dispositivo y cargamos el modelo
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = None
-        self.idx_to_action = {0: Directions.STOP, 1: Directions.NORTH, 2: Directions.SOUTH, 3: Directions.EAST, 4: Directions.WEST}
+        self.neural_helper = NeuralAgent(model_path)
         
         # Intentamos cargar el modelo (similar a como lo hace NeuralAgent)
         try:
@@ -658,11 +655,8 @@ class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
         """
         if self.model is None: return 0
 
-        # Para evaluar el estado con la red, necesitamos crear un agente fantasma temporal
-        # y mapear el estado a matriz (reutilizamos la lógica del NeuralAgent)
-        temp_agent = NeuralAgent() 
-        state_matrix = temp_agent.state_to_matrix(state)
-        state_tensor = torch.FloatTensor(state_matrix).unsqueeze(0).to(self.device)
+        state_matrix = self.neural_helper.state_to_matrix(state)
+        state_tensor = torch.FloatTensor(state_matrix).unsqueeze(0).to(self.neural_helper.device)
         
         with torch.no_grad():
             output = self.model(state_tensor)
