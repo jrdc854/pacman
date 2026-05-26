@@ -76,7 +76,7 @@ class ReflexAgent(Agent):
         newFood = successorGameState.getFood()
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
-
+        
         "*** YOUR CODE HERE ***"
         return successorGameState.getScore()
 
@@ -330,6 +330,68 @@ class NeuralAgent(Agent):
                 if ghost_distance <= 2:
                     score -= 200  # Gran penalización por estar demasiado cerca
         
+        # ==================================================
+        # nuevas heurísticas añadidias (task 1)
+        # ==================================================
+
+        # heurística nueva 1: atracción hacia las cápsulas de poder
+        # incentiva al pacman a buscar cápsulas si están cerca para activar el modo caza
+        capsules = state.getCapsules()
+        if capsules:
+            min_capsule_distance = min(manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsules)
+            score += 10.0 / (min_capsule_distance + 1)
+            score -= 20.0 * len(capsules) #penalizar por dejar  capsulas sin comer
+
+        #heurística nueva 2: evitar caminos sin salida
+        #alerta para que pacman no se meta voluntariamente en caminos sin salida
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer == 0:
+                ghost_pos = ghost_state.getPosition()
+                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+                if ghost_distance == 3:
+                    score -= 50
+        
+        #heuristica nueva 3: incentivo por muerte de un fantasma
+        # si un fantasma asustado está a distancia de 1 paso, asegura que Pacman se lo coma
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer > 0:
+                ghost_pos = ghost_state.getPosition()
+                ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+                if ghost_distance == 1:
+                    score += 500
+
+
+        #heurística nueva 4: evitar acorralamiento
+        #si hay más de un fantasma activo persiguiendo a pacman a corta distancia hay peligro
+        active_ghosts_near = 0
+        for ghost_state in ghost_states:
+            if ghost_state.scaredTimer == 0:
+                if manhattanDistance(pacman_pos, ghost_state.getPosition()) <= 3:
+                    active_ghosts_near += 1
+        if active_ghosts_near > 1:
+            score -= 600
+
+        #heurística nueva 5: gestión del tiempo del fantasma asustado
+        for ghost_state in ghost_states:
+            if 0 < ghost_state.scaredTimer <= 2:
+                ghost_distance = manhattanDistance(pacman_pos, ghost_state.getPosition())
+                if ghost_distance > ghost_state.scaredTimer:
+                    score -= 100
+        
+
+        #heurística nueva 6: penalización por volumen de comida 
+        #fuera al pacman a preferir estados donde el número total de comida sea menor
+        if food:
+            score -= 4.0 * len(food)
+
+
+        #heurística nueva 7: tener opciones de huida
+        # incentiva al pacman a mantener tres o más direcciones posibles para evitar ser arrinconado
+        if len(legal_actions) >= 3:
+            score += 15
+
+
+
         # Combinar la puntuación de la red con la heurística
         neural_score = 0
         for i, action in enumerate(self.idx_to_action.values()):
