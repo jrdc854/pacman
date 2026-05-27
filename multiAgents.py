@@ -722,13 +722,36 @@ class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
 
         return bestAction
 
-    def evaluation_combined(self, state):
+    def evaluation_combined(self, state): # mejoramos esta funcion 
         """
-        Calcula la puntuación del estado final multiplicando por los pesos
+        Calcula la puntuación del estado final ajustando los pesos DINÁMICAMENTE
+        según la situación del juego (Punto Opcional).
         """
         trad_score = self.traditional_evaluation(state)
         neural_score = self.neural_evaluation(state)
-        return (self.w_heuristic * trad_score) + (self.w_neural * neural_score)
+        
+        # Pesos por defecto
+        dynamic_w_heuristic = self.w_heuristic
+        dynamic_w_neural = self.w_neural
+        
+        # Comprobamos si hay algún fantasma asustado en este estado
+        ghost_states = state.getGhostStates()
+        hay_fantasmas_asustados = any(ghost.scaredTimer > 0 for ghost in ghost_states)
+        
+        if hay_fantasmas_asustados:
+            # Las heurísticas saben exactamente cómo cazar (Heurística 3). 
+            # Le damos 90% de importancia a la heurística y 10% a la red.
+            dynamic_w_heuristic = 0.9
+            dynamic_w_neural = 0.1
+        else:
+            # fantasmas peligrosos
+            # La red neuronal entrenada es mejor esquivando a largo plazo.
+            # Le damos 70% de importancia a la intuición de la red y 30% a las reglas básicas.
+            dynamic_w_heuristic = 0.3
+            dynamic_w_neural = 0.7
+            
+        return (dynamic_w_heuristic * trad_score) + (dynamic_w_neural * neural_score)
+
 
     def traditional_evaluation(self, state):
         """
