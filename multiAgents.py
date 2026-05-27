@@ -73,12 +73,54 @@ class ReflexAgent(Agent):
         # Useful information you can extract from a GameState (pacman.py)
         successorGameState = currentGameState.generatePacmanSuccessor(action)
         newPos = successorGameState.getPacmanPosition()
-        newFood = successorGameState.getFood()
+        newFood = successorGameState.getFood().asList()
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
         
-        "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        score = successorGameState.getScore()
+
+        #H1: Distancia a la comida más cercana 
+        if newFood: 
+            min_food_distance = min(manhattanDistance(newPos, f) for f in newFood)
+            score += 1.0 / (min_food_distance + 1)
+
+        #H2: Proximidad a fantasmas (peligrosos y asustados)
+        for ghost_state in newGhostStates:
+            ghost_pos = ghost_state.getPosition()
+            ghost_distance = manhattanDistance(newPos, ghost_pos)
+
+            if ghost_state.scaredTimer > 0:
+                score += 50 / (ghost_distance + 1)
+            else:
+                if ghost_distance <= 2:
+                    score -= 200
+        
+        #H3: Atracción hacia cápsulas de poder
+        capsules = successorGameState.getCapsules()
+        if capsules:
+            min_capsule_distance = min(manhattanDistance(newPos, c) for c in capsules)
+            score += 10.0 / (min_capsule_distance + 1)
+            score -= 20.0 * len(capsules)
+
+        #H4: Evitar accorralamiento por varios fantasmas activos
+        active_ghost_near = sum(
+            1 for g in newGhostStates
+            if g.scaredTimer == 0 and manhattanDistance(newPos, g.getPosition()) <= 3
+        ) 
+        if active_ghost_near > 1:
+            score -= 600
+        
+
+        #H5: Penalización por volumen de comida restante
+        score -= 4.0 * len(newFood)
+
+        #H6: Tener opciones de huida
+        if len(successorGameState.getLegalActions(0)) >= 3:
+            score += 15
+        
+        return score
+
+
 
 def scoreEvaluationFunction(currentGameState: GameState):
     """
@@ -300,15 +342,63 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
                 bestAction = action
         return bestAction
 
+
 def betterEvaluationFunction(currentGameState: GameState):
     """
-    Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
-    evaluation function (question 5).
+    Función de evaluación mejorada para Expectimax.
 
-    DESCRIPTION: <write something here so we know what you did>
+    Combina las mismas heurísticas del NeuralAgent:
+    - Distancia a la comida más cercana
+    - Proximidad a fantasmas (peligrosos y asustados)
+    - Atracción hacia cápsulas de poder
+    - Evitar acorralamiento por varios fantasmas
+    - Penalización por volumen de comida restante
+    - Tener opciones de huida
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    score = currentGameState.getScore()
+    pacman_pos = currentGameState.getPacmanPosition()
+    food_list = currentGameState.getFood().asList()
+    ghost_states = currentGameState.getGhostStates()
+    capsules = currentGameState.getCapsules()
+
+    # H1: Distancia a la comida más cercana
+    if food_list:
+        min_food_distance = min(manhattanDistance(pacman_pos, f) for f in food_list)
+        score += 1.0 / (min_food_distance + 1)
+
+    # H2: Proximidad a fantasmas (peligrosos y asustados)
+    for ghost_state in ghost_states:
+        ghost_pos = ghost_state.getPosition()
+        ghost_distance = manhattanDistance(pacman_pos, ghost_pos)
+
+        if ghost_state.scaredTimer > 0:
+            score += 50 / (ghost_distance + 1)
+        else:
+            if ghost_distance <= 2:
+                score -= 200
+
+    # H3: Atracción hacia cápsulas de poder
+    if capsules:
+        min_capsule_distance = min(manhattanDistance(pacman_pos, c) for c in capsules)
+        score += 10.0 / (min_capsule_distance + 1)
+        score -= 20.0 * len(capsules)
+
+    # H4: Evitar acorralamiento por varios fantasmas activos
+    active_ghosts_near = sum(
+        1 for g in ghost_states
+        if g.scaredTimer == 0 and manhattanDistance(pacman_pos, g.getPosition()) <= 3
+    )
+    if active_ghosts_near > 1:
+        score -= 600
+
+    # H5: Penalización por volumen de comida restante
+    score -= 4.0 * len(food_list)
+
+    # H6: Tener opciones de huida
+    if len(currentGameState.getLegalActions(0)) >= 3:
+        score += 15
+
+    return score
 
 # Abbreviation
 better = betterEvaluationFunction
@@ -637,17 +727,13 @@ class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
         self.neural_helper = NeuralAgent(model_path)
         
         # Intentamos cargar el modelo (similar a como lo hace NeuralAgent)
-        try:
-            if os.path.exists(model_path):
-                checkpoint = torch.load(model_path, map_location=self.device)
-                self.model = PacmanNet(checkpoint['input_size'], 128, 5).to(self.device)
-                self.model.load_state_dict(checkpoint['model_state_dict'])
-                self.model.eval()
-                print(f"AlphaBetaNeuralAgent: Modelo cargado correctamente desde {model_path}")
-            else:
-                print(f"AlphaBetaNeuralAgent: ADVERTENCIA - No se encontró el modelo en {model_path}")
-        except Exception as e:
-            print(f"AlphaBetaNeuralAgent: Error al cargar el modelo: {e}")
+
+        self.model = self.neural_helper.model
+        if self.model is not None: 
+            print(f"AlphaBetaNeuralAgent: Enlazado al modelo de NeuralAgent con éxito.")
+        else:
+            print(f"AlphaBetaNeuralAgent: ADVERTENCIA - No se pudo enlazar el modelo (es None).")
+
 
     def getAction(self, gameState: GameState):
         """
