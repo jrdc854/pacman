@@ -413,10 +413,15 @@ class NeuralAgent(Agent):
     Un agente de Pacman que utiliza una red neuronal para tomar decisiones
     basado en la evaluación del estado del juego.
     """
-    def __init__(self, model_path="models/pacman_model.pth"):
+    def __init__(self, model_path="models/pacman_model.pth", use_heuristics=True):
         super().__init__()
         self.model = None
         self.input_size = None
+        # -a pasa strings: "False" como string es truthy en Python, hay que convertirlo
+        if isinstance(use_heuristics, str):
+            self.use_heuristics = use_heuristics.lower() not in ('false', '0', 'no')
+        else:
+            self.use_heuristics = bool(use_heuristics)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.load_model(model_path)
         
@@ -435,7 +440,8 @@ class NeuralAgent(Agent):
         # Contador de movimientos
         self.move_count = 0
         
-        print(f"NeuralAgent inicializado, usando dispositivo: {self.device}")
+        mode = "con heurísticas" if self.use_heuristics else "GREEDY PURO (solo red neuronal)"
+        print(f"NeuralAgent inicializado [{mode}], usando dispositivo: {self.device}")
 
     def load_model(self, model_path):
         """Carga el modelo desde el archivo guardado"""
@@ -625,7 +631,8 @@ class NeuralAgent(Agent):
     def getAction(self, state):
         """
         Devuelve la mejor acción basada en la evaluación de la red neuronal
-        y heurísticas adicionales.
+        y heurísticas adicionales (si use_heuristics=True).
+        Si use_heuristics=False, usa solo la predicción de la red neuronal (greedy puro).
         """
         self.move_count += 1
         
@@ -657,6 +664,16 @@ class NeuralAgent(Agent):
         # Ordenar por probabilidad (mayor a menor)
         action_probs.sort(key=lambda x: x[1], reverse=True)
         
+        # ===== MODO GREEDY PURO (sin heurísticas) =====
+        if not self.use_heuristics:
+            # Simplemente devolver la acción con mayor probabilidad de la red
+            # Excluir STOP si hay otras opciones
+            for action, prob in action_probs:
+                if action != Directions.STOP or len(action_probs) == 1:
+                    return action
+            return action_probs[0][0]
+        
+        # ===== MODO CON HEURÍSTICAS (comportamiento original) =====
         # Exploración: con una probabilidad decreciente, elegir aleatoriamente
         exploration_rate = 0.2 * (0.99 ** self.move_count)  # Disminuye con el tiempo
         if random.random() < exploration_rate:
