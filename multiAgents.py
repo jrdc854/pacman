@@ -180,44 +180,45 @@ class MinimaxAgent(MultiAgentSearchAgent):
         gameState.isLose():
         Returns whether or not the game state is a losing state
         """
-        def value(agentIndex, depth, state):
-            if state.isWin() or state.isLose() or depth == self.depth:
-                return self.evaluationFunction(state)
+        def minimax(agentIndex, depth, gameState):
+            if gameState.isWin() or gameState.isLose() or depth == self.depth:
+                return self.evaluationFunction(gameState)
             if agentIndex == 0:
-                return maxValue(agentIndex, depth, state)
-            return minValue(agentIndex, depth, state)
+                return maxValue(agentIndex, depth, gameState)
+            else:
+                return minValue(agentIndex, depth, gameState)
         
-        def maxValue(agentIndex, depth, state):
+        def maxValue(agentIndex, depth, gameState):
             v = float('-inf')
-            legalActions = state.getLegalActions(agentIndex)
+            legalActions = gameState.getLegalActions(agentIndex)
             if not legalActions:
-                return self.evaluationFunction(state)
+                return self.evaluationFunction(gameState)
             for action in legalActions:
-                successor = state.generateSuccessor(agentIndex, action)
-                v = max(v, value(1, depth, successor))
+                successor = gameState.generateSuccessor(agentIndex, action)
+                v = max(v, minimax(1, depth, successor))
             return v
         
-        def minValue(agentIndex, depth, state):
+        def minValue(agentIndex, depth, gameState):
             v = float('inf')
-            legalActions = state.getLegalActions(agentIndex)
+            legalActions = gameState.getLegalActions(agentIndex)
             if not legalActions:
-                return self.evaluationFunction(state)
+                return self.evaluationFunction(gameState)
             nextAgent = agentIndex + 1
             nextDepth = depth
-            if nextAgent == state.getNumAgents():
+            if nextAgent == gameState.getNumAgents():
                 nextAgent = 0
-                nextDepth += 1
+                nextDepth = depth + 1
             for action in legalActions:
-                successor = state.generateSuccessor(agentIndex, action)
-                v = min(v, value(nextAgent, nextDepth, successor))
+                successor = gameState.generateSuccessor(agentIndex, action)
+                v = min(v, minimax(nextAgent, nextDepth, successor))
             return v
         
         bestAction = None
         bestScore = float('-inf')
         for action in gameState.getLegalActions(0):
             successor = gameState.generateSuccessor(0, action)
-            score = value(1, 0, successor)
-            if score > bestScore or bestAction is None:
+            score = minimax(1, 0, successor)
+            if score > bestScore:
                 bestScore = score
                 bestAction = action
         return bestAction
@@ -231,54 +232,56 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         """
         Returns the minimax action using self.depth and self.evaluationFunction
         """
-        def value(agentIndex, depth, state, alpha, beta):
-            if state.isWin() or state.isLose() or depth == self.depth:
-                return self.evaluationFunction(state)
+        def alphabeta(agentIndex, depth, gameState, alpha, beta):
+            if gameState.isWin() or gameState.isLose() or depth == self.depth:
+                return self.evaluationFunction(gameState)
             if agentIndex == 0:
-                return maxValue(agentIndex, depth, state, alpha, beta)
-            return minValue(agentIndex, depth, state, alpha, beta)
+                return maxValue(agentIndex, depth, gameState, alpha, beta)
+            else:
+                return minValue(agentIndex, depth, gameState, alpha, beta)
 
-        def maxValue(agentIndex, depth, state, alpha, beta):
+        def maxValue(agentIndex, depth, gameState, alpha, beta):
             v = float('-inf')
-            legalActions = state.getLegalActions(agentIndex)
+            legalActions = gameState.getLegalActions(agentIndex)
             if not legalActions:
-                return self.evaluationFunction(state)
+                return self.evaluationFunction(gameState)
             for action in legalActions:
-                successor = state.generateSuccessor(agentIndex, action)
-                v = max(v, value(1, depth, successor, alpha, beta))
+                successor = gameState.generateSuccessor(agentIndex, action)
+                v = max(v, alphabeta(1, depth, successor, alpha, beta))
                 if v > beta:
                     return v
-                alpha = max(alpha, v)
+                alpha = max(alpha, v) ###
             return v
     
-        def minValue(agentIndex, depth, state, alpha, beta):
+        def minValue(agentIndex, depth, gameState, alpha, beta):
                 v = float('inf')
-                legalActions = state.getLegalActions(agentIndex)
+                legalActions = gameState.getLegalActions(agentIndex)
                 if not legalActions:
-                    return self.evaluationFunction(state)
+                    return self.evaluationFunction(gameState)
 
                 nextAgent = agentIndex + 1
                 nextDepth = depth
-                if nextAgent == state.getNumAgents():
+                if nextAgent == gameState.getNumAgents():
                     nextAgent = 0
                     nextDepth += 1
 
                 for action in legalActions:
-                    successor = state.generateSuccessor(agentIndex, action)
-                    v = min(v, value(nextAgent, nextDepth, successor, alpha, beta))
+                    successor = gameState.generateSuccessor(agentIndex, action)
+                    v = min(v, alphabeta(nextAgent, nextDepth, successor, alpha, beta))
                     if v < alpha:
                         return v
-                    beta = min(beta, v)
+                    beta = min(beta, v) ###
                 return v
 
         bestAction = None
         bestScore = float('-inf')
+        #######
         alpha = float('-inf')
         beta = float('inf')
         for action in gameState.getLegalActions(0):
             successor = gameState.generateSuccessor(0, action)
-            score = value(1, 0, successor, alpha, beta)
-            if score > bestScore or bestAction is None:
+            score = alphabeta(1, 0, successor, alpha, beta)
+            if score > bestScore:
                 bestScore = score
                 bestAction = action
             alpha = max(alpha, bestScore)
@@ -732,103 +735,36 @@ para optimizar el cálculo se utiliza la poda alpha-beta.
 - Beta: La puntuación máxima que los Fantasmas están dispuestos a permitir a Pacman en el peor de los casos.
 """
 
-class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
+class AlphaBetaNeuralAgent(AlphaBetaAgent):
     """
-    Agente híbrido: Poda Alfa-Beta combinada con Red Neuronal y Heurísticas
+    Agente híbrido que HEREDA la poda Alfa-Beta de AlphaBetaAgent
+    y reemplaza la función de evaluación por una combinación ponderada
+    de heurísticas tradicionales + red neuronal.
+    
+    final_score = w_heuristic * traditional_score + w_neural * neural_score
     """
-    def __init__(self, evalFn='scoreEvaluationFunction', depth='2', w_heuristic=1.0, w_neural=1.0, model_path="models/pacman_model.pth"):
+    def __init__(self, evalFn='scoreEvaluationFunction', depth='2', w_heuristic='1.0', w_neural='1.0', model_path="models/pacman_model.pth"):
         super().__init__(evalFn, depth)
         self.w_heuristic = float(w_heuristic)
         self.w_neural = float(w_neural)
         
         self.neural_helper = NeuralAgent(model_path)
-        
-        # Intentamos cargar el modelo (similar a como lo hace NeuralAgent)
-
         self.model = self.neural_helper.model
+
         if self.model is not None: 
             print(f"AlphaBetaNeuralAgent: Enlazado al modelo de NeuralAgent con éxito.")
         else:
             print(f"AlphaBetaNeuralAgent: ADVERTENCIA - No se pudo enlazar el modelo (es None).")
 
+        # para que el getAction() de AlphaBetaAgent use evaluación combinada
+        self.evaluationFunction = self.evaluation_combined
 
-    def getAction(self, gameState: GameState):
-        """
-        Función principal que devuelve la mejor acción usando el árbol Alfa-Beta
-        """
-        # Función recursiva general
-        def alphabeta(agentIndex, depth, state, alpha, beta):
-            # Casos base: si ganamos, perdemos o llegamos al límite de profundidad mental
-            if state.isWin() or state.isLose() or depth == self.depth:
-                return self.evaluation_combined(state)
-
-            if agentIndex == 0:  # Turno de Pacman (Maximizar)
-                return maxValue(agentIndex, depth, state, alpha, beta)
-            else:  # Turno de los Fantasmas (Minimizar)
-                return minValue(agentIndex, depth, state, alpha, beta)
-
-        # Turno de Pacman: Busca la puntuación más ALTA
-        def maxValue(agentIndex, depth, state, alpha, beta):
-            v = float('-inf')
-            legalActions = state.getLegalActions(agentIndex)
-            if not legalActions: return self.evaluation_combined(state)
-                
-            for action in legalActions:
-                successor = state.generateSuccessor(agentIndex, action)
-                # Siguiente turno: primer fantasma (agentIndex 1), misma profundidad
-                v = max(v, alphabeta(1, depth, successor, alpha, beta))
-                if v > beta: 
-                    return v # Poda! (El fantasma nunca permitirá llegar a este caso)
-                alpha = max(alpha, v)
-            return v
-
-        # Turno de Fantasmas: Buscan la puntuación más BAJA para fastidiar a Pacman
-        def minValue(agentIndex, depth, state, alpha, beta):
-            v = float('inf')
-            legalActions = state.getLegalActions(agentIndex)
-            if not legalActions: return self.evaluation_combined(state)
-
-            nextAgent = agentIndex + 1
-            nextDepth = depth
-            # Si ya movieron todos los fantasmas, volvemos a Pacman (agent 0) y bajamos un nivel de profundidad
-            if nextAgent == state.getNumAgents():
-                nextAgent = 0
-                nextDepth += 1
-
-            for action in legalActions:
-                successor = state.generateSuccessor(agentIndex, action)
-                v = min(v, alphabeta(nextAgent, nextDepth, successor, alpha, beta))
-                if v < alpha: 
-                    return v # Poda! (Pacman nunca elegirá la rama que llevó a este caso)
-                beta = min(beta, v)
-            return v
-
-        # AQUÍ EMPIEZA LA LÓGICA DEL PRIMER MOVIMIENTO DE PACMAN
-        bestAction = None
-        bestScore = float('-inf')
-        alpha = float('-inf')
-        beta = float('inf')
-
-        legalActions = gameState.getLegalActions(0)
-        # Por defecto, quitamos STOP si hay más opciones para que no se quede quieto
-        if len(legalActions) > 1 and Directions.STOP in legalActions:
-            legalActions.remove(Directions.STOP)
-
-        for action in legalActions:
-            successor = gameState.generateSuccessor(0, action)
-            # Iniciamos la recursión con el fantasma 1
-            score = alphabeta(1, 0, successor, alpha, beta)
-            if score > bestScore:
-                bestScore = score
-                bestAction = action
-            alpha = max(alpha, bestScore)
-
-        return bestAction
-
-    def evaluation_combined(self, state): # mejoramos esta funcion 
+    def evaluation_combined(self, state):
         """
         Calcula la puntuación del estado final ajustando los pesos DINÁMICAMENTE
         según la situación del juego (Punto Opcional).
+        
+        final_score = w_heuristic * traditional_score + w_neural * neural_score
         """
         trad_score = self.traditional_evaluation(state)
         neural_score = self.neural_evaluation(state)
@@ -855,10 +791,9 @@ class AlphaBetaNeuralAgent(MultiAgentSearchAgent):
             
         return (dynamic_w_heuristic * trad_score) + (dynamic_w_neural * neural_score)
 
-
     def traditional_evaluation(self, state):
         """
-        Reutilizamos la lógica y heurísticas de tu compañero
+        Evaluación basada en heurísticas del dominio de Pacman.
         """
         score = state.getScore()
         pacman_pos = state.getPacmanPosition()
