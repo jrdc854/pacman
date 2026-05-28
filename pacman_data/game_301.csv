@@ -1,2 +1,0 @@
-timestamp,agent_index,action,score,is_win,is_lose,game_over,map_matrix
-2026-05-27T11:33:08.250028,0,East,0.0,False,False,False,"[[0, 0, 0, 0, 0], [0, 2, 4, 1, 0], [0, 2, 0, 1, 0], [0, 2, 0, 1, 0], [0, 2, 0, 5, 0], [0, 1, 0, 1, 0], [0, 1, 0, 4, 0], [0, 0, 0, 0, 0]]"
